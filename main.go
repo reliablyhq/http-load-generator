@@ -80,7 +80,7 @@ func main() {
 		for {
 			newTime := <-ticker.C
 
-			logChan <- fmt.Sprintf("running for %.0f of %v seconds\n", newTime.Sub(start).Seconds(), runForSeconds)
+			logChan <- fmt.Sprintf("running for %.0f of %v seconds", newTime.Sub(start).Seconds(), runForSeconds)
 
 			for i := 0; i < requestsPerSecond; i++ {
 				workChan <- &requestParams{
