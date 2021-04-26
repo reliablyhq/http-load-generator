@@ -6,6 +6,8 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -16,6 +18,7 @@ var (
 	workers           int
 	minLatencyMs      int
 	maxLatencyMs      int
+	statusCodeFetcher func() int
 
 	latencyResults = []int64{}
 )
@@ -28,12 +31,17 @@ type requestParams struct {
 const urlFormat = "%s/?latencyms=%v&statusCode=%v"
 
 func init() {
+	var statusCode int
+	var statusCodeOptionsString string
+
 	flag.StringVar(&host, "host", "", "the host that requests will be made to")
 	flag.IntVar(&requestsPerSecond, "rps", 5, "the number of requests to send per second")
 	flag.IntVar(&runForSeconds, "for", 10, "the number of seconds to run for")
 	flag.IntVar(&workers, "workers", 5, "the number of workers to use")
 	flag.IntVar(&minLatencyMs, "min-latency", 0, "the minimum latency in millieconds")
 	flag.IntVar(&maxLatencyMs, "max-latency", 0, "the maximum latency in millieconds")
+	flag.IntVar(&statusCode, "status-code", -1, "the status code you want to return")
+	flag.StringVar(&statusCodeOptionsString, "status-codes", "", "a collection of status codes to return randomly")
 
 	flag.Parse()
 
@@ -43,6 +51,30 @@ func init() {
 
 	if minLatencyMs > maxLatencyMs {
 		log.Fatal("min latency must be less than or equal to max latency")
+	}
+
+	if statusCode > -1 {
+		statusCodeFetcher = func() int {
+			return statusCode
+		}
+	} else if statusCodeOptionsString != "" {
+		parts := strings.Split(statusCodeOptionsString, ",")
+		ints := []int{}
+		for index, p := range parts {
+			if i, err := strconv.Atoi(p); err == nil {
+				ints = append(ints, i)
+			} else {
+				log.Fatalf("status code option %v is not a valid int", index)
+			}
+		}
+
+		statusCodeFetcher = func() int {
+			return ints[rand.Intn(len(ints))]
+		}
+	} else {
+		statusCodeFetcher = func() int {
+			return 200
+		}
 	}
 }
 
@@ -84,7 +116,7 @@ func main() {
 
 			for i := 0; i < requestsPerSecond; i++ {
 				workChan <- &requestParams{
-					statusCode: 200,
+					statusCode: statusCodeFetcher(),
 					latency:    time.Duration(randomInRange(minLatencyMs, maxLatencyMs)) * time.Millisecond,
 				}
 			}
@@ -97,5 +129,9 @@ func main() {
 }
 
 func randomInRange(min, max int) int {
+	if min == max {
+		return min
+	}
+
 	return rand.Intn(max-min) + min
 }
