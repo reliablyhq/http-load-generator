@@ -28,7 +28,7 @@ type requestParams struct {
 	statusCode int
 }
 
-const urlFormat = "%s/?latencyms=%v&statusCode=%v"
+const urlFormat = "%s/?latency=%v&statuscode=%v"
 
 func init() {
 	var statusCode int
@@ -88,12 +88,15 @@ func main() {
 		go func(workerId int) {
 			for {
 				d := <-workChan
-				url := fmt.Sprintf(urlFormat, host, d.latency.Milliseconds(), d.statusCode)
+				url := fmt.Sprintf(urlFormat, host, d.latency.String(), d.statusCode)
 
 				logChan <- fmt.Sprintf("Worker %v -> %v", workerId, url)
 
 				start := time.Now().UnixNano()
-				client.Get(url)
+				if _, err := client.Get(url); err != nil {
+					log.Print(err)
+					continue
+				}
 				end := time.Now().UnixNano()
 				latencyResults = append(latencyResults, end-start)
 			}
